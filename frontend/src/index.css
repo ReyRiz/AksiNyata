@@ -1,0 +1,308 @@
+:root {
+  /* Primary green colors */
+  --primary-color: #009432;
+  --primary-dark: #006622;
+  --primary-light: #28b463;
+  --primary-very-light: #e8f8e8;
+
+  /* Neutral colors */
+  --neutral-dark: #333333;
+  --neutral-medium: #666666;
+  --neutral-light: #999999;
+  --neutral-very-light: #f4f4f4;
+
+  /* Accent colors */
+  --accent-success: #27ae60;
+  --accent-info: #3498db;
+  --accent-warning: #f39c12;
+  --accent-danger: #e74c3c;
+}
+
+body {
+  margin: 0;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--neutral-dark);
+  background-color: var(--neutral-very-light);
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Custom button styles */
+.btn-primary {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active {
+  background-color: var(--primary-dark) !important;
+  border-color: var(--primary-dark) !important;
+}
+
+.btn-outline-primary {
+  color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary:focus,
+.btn-outline-primary:active {
+  background-color: var(--primary-color) !important;
+  color: white !important;
+}
+
+/* Links */
+a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+
+/* Custom card styles */
+.card {
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: none;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Progress bar styles */
+.progress {
+  height: 10px;
+  border-radius: 5px;
+}
+
+.progress-bar {
+  background-color: var(--primary-color);
+}
+
+/* Form elements */
+.form-control:focus {
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 0.25rem rgba(0, 148, 50, 0.25);
+}
+
+/* Navbar styles */
+.navbar-brand {
+  font-weight: 700;
+  color: var(--primary-color) !important;
+}
+
+.nav-link {
+  font-weight: 500;
+}
+
+.nav-link.active {
+  color: var(--primary-color) !important;
+}
+
+/* Footer styles */
+footer {
+  background-color: var(--primary-very-light);
+  color: var(--neutral-medium);
+  padding: 2rem 0;
+}
+
+/* Utility classes */
+.text-primary {
+  color: var(--primary-color) !important;
+}
+
+.bg-primary {
+  background-color: var(--primary-color) !important;
+}
+
+.bg-light-green {
+  background-color: var(--primary-very-light) !important;
+}
+
+/* Campaign card */
+.campaign-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.campaign-card .card-body {
+  flex: 1;
+}
+
+.campaign-img {
+  height: 200px;
+  object-fit: cover;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+/* Donation form */
+.donation-form {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Badge styles */
+.badge.bg-success {
+  background-color: var(--accent-success) !important;
+}
+
+.badge.bg-warning {
+  background-color: var(--accent-warning) !important;
+}
+
+.badge.bg-danger {
+  background-color: var(--accent-danger) !important;
+}
+
+/* Auth forms */
+.auth-form {
+  max-width: 450px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.auth-form h2 {
+  color: var(--primary-color);
+  margin-bottom: 1.5rem;
+}
+
+/* Hero section */
+.hero {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+  color: white;
+  padding: 4rem 0;
+  margin-bottom: 2rem;
+}
+
+.hero h1 {
+  font-weight: 700;
+}
+
+/* Avatar */
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatar-lg {
+  width: 80px;
+  height: 80px;
+}
+
+/* Role badges */
+.role-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 30px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.role-organizer {
+  background-color: var(--primary-very-light);
+  color: var(--primary-color);
+}
+
+.role-creator {
+  background-color: #e8f4fd;
+  color: var(--accent-info);
+}
+
+.role-donor {
+  background-color: #fff8e1;
+  color: var(--accent-warning);
+}
+
+/* Dashboard sidebar */
+.dashboard-sidebar {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+}
+
+.dashboard-sidebar .nav-link {
+  color: var(--neutral-medium);
+  padding: 0.5rem 0;
+}
+
+.dashboard-sidebar .nav-link:hover,
+.dashboard-sidebar .nav-link.active {
+  color: var(--primary-color);
+}
+
+/* Dashboard card */
+.dashboard-card {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-card h3 {
+  font-size: 1.25rem;
+  color: var(--neutral-dark);
+  margin-bottom: 1rem;
+}
+
+/* Milestone card */
+.milestone-card {
+  border-left: 3px solid var(--primary-color);
+  padding-left: 1rem;
+  margin-bottom: 1rem;
+}
+
+.milestone-achieved {
+  border-left-color: var(--accent-success);
+}
+
+/* Donation item */
+.donation-item {
+  border-bottom: 1px solid var(--neutral-very-light);
+  padding: 1rem 0;
+}
+
+.donation-item:last-child {
+  border-bottom: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .hero {
+    padding: 3rem 0;
+  }
+  
+  .campaign-img {
+    height: 180px;
+  }
+  
+  .auth-form {
+    margin: 1rem;
+    padding: 1.5rem;
+  }
+}
