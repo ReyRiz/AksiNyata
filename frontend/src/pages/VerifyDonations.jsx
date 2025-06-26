@@ -1,5 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Alert, Table, Modal, Form, Badge, Row, Col, InputGroup } from 'react-bootstrap';
+import { 
+  Card, 
+  Button, 
+  Alert, 
+  Table, 
+  Modal, 
+  Form, 
+  Badge, 
+  Row, 
+  Col, 
+  InputGroup, 
+  Spinner, 
+  Container 
+} from 'react-bootstrap';
 import { getAllDonations, verifyDonation, rejectDonation } from '../services/api';
 
 const VerifyDonations = () => {
@@ -26,11 +39,20 @@ const VerifyDonations = () => {
   const fetchDonations = async () => {
     try {
       setLoading(true);
+      setError(''); // Clear previous errors
       const donationsData = await getAllDonations();
-      setDonations(donationsData);
+      
+      // Ensure donationsData is an array
+      if (Array.isArray(donationsData)) {
+        setDonations(donationsData);
+      } else {
+        console.warn('Received non-array donations data:', donationsData);
+        setDonations([]);
+      }
     } catch (err) {
       console.error('Failed to fetch donations:', err);
-      setError('Failed to load donations. Please try again.');
+      setError(err.message || 'Failed to load donations. Please try again.');
+      setDonations([]);
     } finally {
       setLoading(false);
     }
@@ -38,11 +60,13 @@ const VerifyDonations = () => {
   
   // Filter donations based on status and search term
   const filteredDonations = donations.filter(donation => {
+    if (!donation) return false;
+    
     const matchesFilter = filter === 'all' || donation.status === filter;
     const matchesSearch = 
       searchTerm === '' || 
       donation.donor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      donation.campaign_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      donation.campaign_title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       donation.amount?.toString().includes(searchTerm);
     
     return matchesFilter && matchesSearch;
@@ -50,12 +74,20 @@ const VerifyDonations = () => {
   
   // Open verification modal
   const openVerifyModal = (donation) => {
+    if (!donation || !donation.id) {
+      setError('Invalid donation data');
+      return;
+    }
     setProcessingDonation(donation);
     setShowVerifyModal(true);
   };
   
   // Open rejection modal
   const openRejectModal = (donation) => {
+    if (!donation || !donation.id) {
+      setError('Invalid donation data');
+      return;
+    }
     setProcessingDonation(donation);
     setRejectionReason('');
     setShowRejectModal(true);
@@ -66,21 +98,22 @@ const VerifyDonations = () => {
     if (!processingDonation) return;
     
     try {
+      setError(''); // Clear previous errors
       await verifyDonation(processingDonation.id);
       
       // Update local state
       setDonations(prevDonations => 
         prevDonations.map(donation => 
           donation.id === processingDonation.id 
-            ? { ...donation, status: 'verified' } 
+            ? { ...donation, status: 'verified', verified_at: new Date().toISOString() } 
             : donation
         )
       );
       
-      setSuccess(`Donation of Rp ${parseFloat(processingDonation.amount).toLocaleString()} from ${processingDonation.donor_name || 'Anonymous'} has been verified successfully.`);
+      setSuccess(`Donation of Rp ${parseFloat(processingDonation.amount || 0).toLocaleString()} from ${processingDonation.donor_name || 'Anonymous'} has been verified successfully.`);
     } catch (err) {
       console.error('Verification failed:', err);
-      setError('Failed to verify donation. Please try again.');
+      setError(err.message || 'Failed to verify donation. Please try again.');
     } finally {
       setShowVerifyModal(false);
       setProcessingDonation(null);
@@ -91,7 +124,13 @@ const VerifyDonations = () => {
   const handleRejectDonation = async () => {
     if (!processingDonation) return;
     
+    if (!rejectionReason.trim()) {
+      setError('Please provide a reason for rejection.');
+      return;
+    }
+    
     try {
+      setError(''); // Clear previous errors
       await rejectDonation(processingDonation.id, { reason: rejectionReason });
       
       // Update local state
@@ -106,7 +145,7 @@ const VerifyDonations = () => {
       setSuccess(`Donation from ${processingDonation.donor_name || 'Anonymous'} has been rejected.`);
     } catch (err) {
       console.error('Rejection failed:', err);
-      setError('Failed to reject donation. Please try again.');
+      setError(err.message || 'Failed to reject donation. Please try again.');
     } finally {
       setShowRejectModal(false);
       setProcessingDonation(null);
@@ -116,7 +155,14 @@ const VerifyDonations = () => {
   
   // View proof of transfer image
   const handleViewImage = (imageUrl) => {
-    setCurrentImageUrl(imageUrl);
+    if (!imageUrl) return;
+    
+    // Construct full URL if it's a relative path
+    const fullImageUrl = imageUrl.startsWith('http') 
+      ? imageUrl 
+      : `http://localhost:5000/static/${imageUrl}`;
+    
+    setCurrentImageUrl(fullImageUrl);
     setViewImageModal(true);
   };
   
@@ -135,21 +181,37 @@ const VerifyDonations = () => {
   // Status badge component
   const StatusBadge = ({ status }) => {
     let variant = 'secondary';
+    let displayText = status || 'unknown';
     
-    if (status === 'verified') variant = 'success';
-    else if (status === 'pending') variant = 'warning';
-    else if (status === 'rejected') variant = 'danger';
+    if (status === 'verified') {
+      variant = 'success';
+      displayText = 'Verified';
+    } else if (status === 'pending') {
+      variant = 'warning';
+      displayText = 'Pending';
+    } else if (status === 'rejected') {
+      variant = 'danger';
+      displayText = 'Rejected';
+    }
     
-    return <Badge bg={variant}>{status}</Badge>;
+    return <Badge bg={variant}>{displayText}</Badge>;
   };
   
   if (loading && donations.length === 0) {
-    return <div className="text-center my-5"><p>Loading donations...</p></div>;
+    return (
+      <Container className="py-5">
+        <div className="text-center">
+          <Spinner animation="border" variant="primary" />
+          <p className="mt-3">Loading donations...</p>
+        </div>
+      </Container>
+    );
   }
-  
+
   return (
-    <div className="verify-donations-page">
-      <h1 className="text-center mb-4">Verify Donations</h1>
+    <Container className="py-4">
+      <div className="verify-donations-page">
+        <h1 className="text-center mb-4">Verify Donations</h1>
       
       {error && <Alert variant="danger">{error}</Alert>}
       {success && <Alert variant="success">{success}</Alert>}
@@ -194,8 +256,16 @@ const VerifyDonations = () => {
                   variant="outline-secondary" 
                   className="ms-2" 
                   onClick={fetchDonations}
+                  disabled={loading}
                 >
-                  Refresh
+                  {loading ? (
+                    <>
+                      <Spinner animation="border" size="sm" className="me-1" />
+                      Refreshing...
+                    </>
+                  ) : (
+                    'Refresh'
+                  )}
                 </Button>
               </div>
             </Col>
@@ -223,16 +293,16 @@ const VerifyDonations = () => {
                   {filteredDonations.map(donation => (
                     <tr key={donation.id}>
                       <td>{donation.donor_name || 'Anonymous'}</td>
-                      <td>{donation.campaign_name}</td>
-                      <td>Rp {parseFloat(donation.amount).toLocaleString()}</td>
-                      <td>{new Date(donation.date).toLocaleDateString()}</td>
+                      <td>{donation.campaign_title || 'Unknown Campaign'}</td>
+                      <td>Rp {parseFloat(donation.amount || 0).toLocaleString()}</td>
+                      <td>{donation.created_at ? new Date(donation.created_at).toLocaleDateString() : 'Unknown Date'}</td>
                       <td><StatusBadge status={donation.status} /></td>
                       <td>
-                        {donation.proof_of_transfer ? (
+                        {donation.transfer_proof ? (
                           <Button 
                             variant="link" 
                             size="sm" 
-                            onClick={() => handleViewImage(donation.proof_of_transfer)}
+                            onClick={() => handleViewImage(donation.transfer_proof)}
                           >
                             View Image
                           </Button>
@@ -286,17 +356,24 @@ const VerifyDonations = () => {
             <>
               <p>Are you sure you want to verify this donation?</p>
               <p><strong>Donor:</strong> {processingDonation.donor_name || 'Anonymous'}</p>
-              <p><strong>Campaign:</strong> {processingDonation.campaign_name}</p>
-              <p><strong>Amount:</strong> Rp {parseFloat(processingDonation.amount).toLocaleString()}</p>
+              <p><strong>Campaign:</strong> {processingDonation.campaign_title || 'Unknown Campaign'}</p>
+              <p><strong>Amount:</strong> Rp {parseFloat(processingDonation.amount || 0).toLocaleString()}</p>
               
-              {processingDonation.proof_of_transfer && (
+              {processingDonation.transfer_proof && (
                 <div className="mt-3">
                   <p><strong>Proof of Transfer:</strong></p>
                   <img 
-                    src={processingDonation.proof_of_transfer} 
+                    src={processingDonation.transfer_proof.startsWith('http') 
+                      ? processingDonation.transfer_proof 
+                      : `http://localhost:5000/static/${processingDonation.transfer_proof}`
+                    } 
                     alt="Proof of Transfer" 
                     style={{ maxWidth: '100%', maxHeight: '200px' }} 
                     className="border rounded"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = 'https://via.placeholder.com/200x200?text=Image+Not+Found';
+                    }}
                   />
                 </div>
               )}
@@ -323,19 +400,22 @@ const VerifyDonations = () => {
             <>
               <p>Are you sure you want to reject this donation?</p>
               <p><strong>Donor:</strong> {processingDonation.donor_name || 'Anonymous'}</p>
-              <p><strong>Campaign:</strong> {processingDonation.campaign_name}</p>
-              <p><strong>Amount:</strong> Rp {parseFloat(processingDonation.amount).toLocaleString()}</p>
-              
-              <Form.Group className="mt-3">
-                <Form.Label>Reason for Rejection</Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={3}
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Please provide a reason for rejecting this donation"
-                />
-              </Form.Group>
+              <p><strong>Campaign:</strong> {processingDonation.campaign_title || 'Unknown Campaign'}</p>
+              <p><strong>Amount:</strong> Rp {parseFloat(processingDonation.amount || 0).toLocaleString()}</p>                <Form.Group className="mt-3">
+                  <Form.Label>Reason for Rejection <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={3}
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    placeholder="Please provide a reason for rejecting this donation"
+                    required
+                    isInvalid={rejectionReason.length > 0 && rejectionReason.trim().length === 0}
+                  />
+                  <Form.Control.Feedback type="invalid">
+                    Please provide a valid reason for rejection.
+                  </Form.Control.Feedback>
+                </Form.Group>
             </>
           )}
         </Modal.Body>
@@ -343,7 +423,11 @@ const VerifyDonations = () => {
           <Button variant="secondary" onClick={() => setShowRejectModal(false)}>
             Cancel
           </Button>
-          <Button variant="danger" onClick={handleRejectDonation}>
+          <Button 
+            variant="danger" 
+            onClick={handleRejectDonation}
+            disabled={!rejectionReason.trim()}
+          >
             Reject Donation
           </Button>
         </Modal.Footer>
@@ -365,11 +449,16 @@ const VerifyDonations = () => {
               src={currentImageUrl} 
               alt="Proof of Transfer" 
               style={{ maxWidth: '100%' }} 
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = 'https://via.placeholder.com/400x300?text=Image+Not+Found';
+              }}
             />
           )}
         </Modal.Body>
       </Modal>
-    </div>
+      </div>
+    </Container>
   );
 };
 
