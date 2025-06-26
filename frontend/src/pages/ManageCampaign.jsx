@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Form, Button, Alert, Row, Col, Tab, Nav, Table, ProgressBar } from 'react-bootstrap';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { getCampaignById, updateCampaign, getCampaignDonations, updateMilestone } from '../services/api';
 
 const ManageCampaign = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
   
   const [campaign, setCampaign] = useState(null);
   const [donations, setDonations] = useState([]);

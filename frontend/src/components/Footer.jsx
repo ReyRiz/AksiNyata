@@ -16,10 +16,10 @@ const Footer = () => {
               dengan mereka yang membutuhkan bantuan.
             </p>
             <div className="social-icons d-flex gap-3 mt-3">
-              <a href="#" className="text-primary"><i className="bi bi-facebook fs-5"></i></a>
-              <a href="#" className="text-primary"><i className="bi bi-twitter fs-5"></i></a>
-              <a href="#" className="text-primary"><i className="bi bi-instagram fs-5"></i></a>
-              <a href="#" className="text-primary"><i className="bi bi-youtube fs-5"></i></a>
+              <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="text-primary"><i className="bi bi-facebook fs-5"></i></a>
+              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="text-primary"><i className="bi bi-twitter fs-5"></i></a>
+              <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="text-primary"><i className="bi bi-instagram fs-5"></i></a>
+              <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" className="text-primary"><i className="bi bi-youtube fs-5"></i></a>
             </div>
           </Col>
           <Col md={2} className="mb-4 mb-md-0 text-start">

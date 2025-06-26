@@ -1,6 +1,6 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import axios from 'axios';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import jwtDecode from 'jwt-decode';
+import apiClient from '../utils/apiConfig';
 
 // Create context
 const AuthContext = createContext();
@@ -14,6 +14,63 @@ export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Logout user
+  const logout = useCallback(() => {
+    // Remove tokens from local storage
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    
+    // Reset state
+    setCurrentUser(null);
+    setError(null);
+    setLoading(false);
+  }, []);
+
+  // Load user data from API
+  const loadUser = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+      
+      const response = await apiClient.get('/auth/me');
+      setCurrentUser(response.data.user);
+      setError(null);
+    } catch (err) {
+      console.error('Error loading user', err);
+      setError('Failed to load user data');
+      logout();
+    } finally {
+      setLoading(false);
+    }
+  }, [logout]);
+
+  // Refresh token
+  const refreshToken = useCallback(async () => {
+    try {
+      const refreshToken = localStorage.getItem('refreshToken');
+      
+      if (!refreshToken) {
+        logout();
+        return;
+      }
+      
+      const response = await apiClient.post('/auth/refresh');
+      
+      // Save new access token
+      localStorage.setItem('token', response.data.access_token);
+      
+      // Load user data
+      await loadUser();
+    } catch (err) {
+      console.error('Error refreshing token', err);
+      logout();
+    }
+  }, [loadUser, logout]);
 
   useEffect(() => {
     // Check if user is already logged in
@@ -39,38 +96,13 @@ export const AuthProvider = ({ children }) => {
     } else {
       setLoading(false);
     }
-  }, []);
-
-  // Load user data from API
-  const loadUser = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-      
-      // Set authorization header
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      
-      const response = await axios.get('/api/auth/me');
-      setCurrentUser(response.data.user);
-      setError(null);
-    } catch (err) {
-      console.error('Error loading user', err);
-      setError('Failed to load user data');
-      logout();
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [loadUser, refreshToken, logout]);
 
   // Register a new user
   const register = async (userData) => {
     try {
       setLoading(true);
-      const response = await axios.post('/api/auth/register', userData);
+      const response = await apiClient.post('/auth/register', userData);
       
       // Save tokens
       localStorage.setItem('token', response.data.access_token);
@@ -79,9 +111,6 @@ export const AuthProvider = ({ children }) => {
       // Set user data
       setCurrentUser(response.data.user);
       setError(null);
-      
-      // Set authorization header for future requests
-      axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
       
       return response.data;
     } catch (err) {
@@ -96,7 +125,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (credentials) => {
     try {
       setLoading(true);
-      const response = await axios.post('/api/auth/login', credentials);
+      const response = await apiClient.post('/auth/login', credentials);
       
       // Save tokens
       localStorage.setItem('token', response.data.access_token);
@@ -105,9 +134,6 @@ export const AuthProvider = ({ children }) => {
       // Set user data
       setCurrentUser(response.data.user);
       setError(null);
-      
-      // Set authorization header for future requests
-      axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
       
       return response.data;
     } catch (err) {
@@ -118,55 +144,11 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Refresh token
-  const refreshToken = async () => {
-    try {
-      const refreshToken = localStorage.getItem('refreshToken');
-      
-      if (!refreshToken) {
-        logout();
-        return;
-      }
-      
-      // Set refresh token in header
-      axios.defaults.headers.common['Authorization'] = `Bearer ${refreshToken}`;
-      
-      const response = await axios.post('/api/auth/refresh');
-      
-      // Save new access token
-      localStorage.setItem('token', response.data.access_token);
-      
-      // Set authorization header for future requests
-      axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
-      
-      // Load user data
-      await loadUser();
-    } catch (err) {
-      console.error('Error refreshing token', err);
-      logout();
-    }
-  };
-
-  // Logout user
-  const logout = () => {
-    // Remove tokens from local storage
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    
-    // Remove authorization header
-    delete axios.defaults.headers.common['Authorization'];
-    
-    // Reset state
-    setCurrentUser(null);
-    setError(null);
-    setLoading(false);
-  };
-
   // Update user profile
   const updateProfile = async (formData) => {
     try {
       setLoading(true);
-      const response = await axios.put('/api/users/profile', formData, {
+      const response = await apiClient.put('/users/profile', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
@@ -192,7 +174,17 @@ export const AuthProvider = ({ children }) => {
   // Check if user has any of the specified roles
   const hasAnyRole = (roles) => {
     if (!currentUser) return false;
-    return roles.includes(currentUser.role);
+    return Array.isArray(roles) ? roles.includes(currentUser.role) : currentUser.role === roles;
+  };
+
+  // Check if user is admin
+  const isAdmin = () => {
+    return currentUser && currentUser.role === 'admin';
+  };
+
+  // Check if user is regular user
+  const isUser = () => {
+    return currentUser && currentUser.role === 'user';
   };
 
   const value = {
@@ -204,7 +196,9 @@ export const AuthProvider = ({ children }) => {
     logout,
     updateProfile,
     hasRole,
-    hasAnyRole
+    hasAnyRole,
+    isAdmin,
+    isUser
   };
 
   return (

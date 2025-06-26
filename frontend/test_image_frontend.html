@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Frontend Image Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        img { max-width: 400px; margin: 10px 0; border: 1px solid #ccc; }
+        .log { background: #f0f0f0; padding: 10px; margin: 10px 0; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>Frontend Image URL Test</h1>
+    <div id="log" class="log">Loading...</div>
+    
+    <div class="test-section">
+        <h2>Test 1: Direct Image URL</h2>
+        <p>URL: http://localhost:5000/static/uploads/campaigns/20250627_010104_test_campaign.png</p>
+        <img src="http://localhost:5000/static/uploads/campaigns/20250627_010104_test_campaign.png" alt="Direct URL Test" />
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 2: getImageUrl Function Simulation</h2>
+        <div id="test2-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 3: API Campaign Data</h2>
+        <div id="test3-result"></div>
+    </div>
+    
+    <script>
+        // Simulate the getImageUrl function from frontend
+        function getImageUrl(imagePath) {
+            if (!imagePath || imagePath.trim() === '') {
+                console.log('getImageUrl: No image path provided');
+                return null;
+            }
+            
+            let fullUrl;
+            
+            // If it's already a full URL, return as is
+            if (imagePath.startsWith('http')) {
+                fullUrl = imagePath;
+            }
+            // If it's a relative path, build full URL
+            else if (imagePath.startsWith('/')) {
+                fullUrl = `http://localhost:5000${imagePath}`;
+            }
+            // If it doesn't start with /, add it
+            else {
+                fullUrl = `http://localhost:5000/${imagePath}`;
+            }
+            
+            console.log('getImageUrl:', imagePath, '->', fullUrl);
+            return fullUrl;
+        }
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            logDiv.innerHTML += message + '<br>';
+            console.log(message);
+        }
+        
+        // Test 2: getImageUrl function
+        const testImagePath = '/static/uploads/campaigns/20250627_010104_test_campaign.png';
+        const fullImageUrl = getImageUrl(testImagePath);
+        
+        log(`Test 2 - Input: ${testImagePath}`);
+        log(`Test 2 - Output: ${fullImageUrl}`);
+        
+        const test2Result = document.getElementById('test2-result');
+        test2Result.innerHTML = `
+            <p>Input: ${testImagePath}</p>
+            <p>Output: ${fullImageUrl}</p>
+            <img src="${fullImageUrl}" alt="getImageUrl Test" onload="log('Test 2 - Image loaded')" onerror="log('Test 2 - Image failed')" />
+        `;
+        
+        // Test 3: API Data
+        fetch('http://localhost:5000/api/campaigns/8')
+            .then(response => response.json())
+            .then(data => {
+                log(`Test 3 - API Response received`);
+                log(`Test 3 - image_url: ${data.image_url}`);
+                
+                const processedUrl = getImageUrl(data.image_url);
+                log(`Test 3 - Processed URL: ${processedUrl}`);
+                
+                const test3Result = document.getElementById('test3-result');
+                test3Result.innerHTML = `
+                    <p><strong>Campaign:</strong> ${data.title}</p>
+                    <p><strong>Raw image_url:</strong> ${data.image_url}</p>
+                    <p><strong>Processed URL:</strong> ${processedUrl}</p>
+                    <img src="${processedUrl}" alt="API Test" onload="log('Test 3 - Image loaded')" onerror="log('Test 3 - Image failed')" />
+                `;
+            })
+            .catch(error => {
+                log(`Test 3 - API Error: ${error.message}`);
+                document.getElementById('test3-result').innerHTML = `<p>Error: ${error.message}</p>`;
+            });
+        
+        log('Tests initialized');
+    </script>
+</body>
+</html>

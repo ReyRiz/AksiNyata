@@ -20,6 +20,7 @@ import CreateCampaign from './pages/CreateCampaign';
 import ManageCampaign from './pages/ManageCampaign';
 import VerifyDonations from './pages/VerifyDonations';
 import UserManagement from './pages/UserManagement';
+import AdminDashboard from './pages/AdminDashboard';
 import NotFound from './pages/NotFound';
 
 // CSS
@@ -50,27 +51,30 @@ function App() {
                 <Dashboard />
               </PrivateRoute>
             } />
-            
-            {/* Organizer & Creator Routes */}
             <Route path="/campaigns/create" element={
-              <RoleRoute allowedRoles={['organizer', 'creator']}>
+              <PrivateRoute>
                 <CreateCampaign />
-              </RoleRoute>
+              </PrivateRoute>
             } />
             <Route path="/campaigns/manage/:id" element={
-              <RoleRoute allowedRoles={['organizer', 'creator']}>
+              <PrivateRoute>
                 <ManageCampaign />
-              </RoleRoute>
+              </PrivateRoute>
             } />
             
-            {/* Organizer Only Routes */}
-            <Route path="/donations/verify" element={
-              <RoleRoute allowedRoles={['organizer']}>
+            {/* Admin Only Routes */}
+            <Route path="/admin/dashboard" element={
+              <RoleRoute allowedRoles={['admin']}>
+                <AdminDashboard />
+              </RoleRoute>
+            } />
+            <Route path="/admin/donations" element={
+              <RoleRoute allowedRoles={['admin']}>
                 <VerifyDonations />
               </RoleRoute>
             } />
-            <Route path="/users/manage" element={
-              <RoleRoute allowedRoles={['organizer']}>
+            <Route path="/admin/users" element={
+              <RoleRoute allowedRoles={['admin']}>
                 <UserManagement />
               </RoleRoute>
             } />

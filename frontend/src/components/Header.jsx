@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const Header = () => {
-  const { currentUser, logout, hasAnyRole } = useAuth();
+  const { currentUser, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -22,12 +22,20 @@ const Header = () => {
         <Navbar.Collapse id="basic-navbar-nav">
           <Nav className="me-auto">
             <Nav.Link as={Link} to="/">Beranda</Nav.Link>
-            <Nav.Link as={Link} to="/campaigns">Donasi</Nav.Link>
-            {hasAnyRole(['organizer', 'creator']) && (
-              <Nav.Link as={Link} to="/campaigns/create">Buat Donasi</Nav.Link>
+            <Nav.Link as={Link} to="/campaigns">Kampanye</Nav.Link>
+            {currentUser && (
+              <Nav.Link as={Link} to="/campaigns/create">Buat Kampanye</Nav.Link>
             )}
             {currentUser && (
               <Nav.Link as={Link} to="/dashboard">Dashboard</Nav.Link>
+            )}
+            {isAdmin() && (
+              <NavDropdown title="Admin" id="admin-nav-dropdown">
+                <NavDropdown.Item as={Link} to="/admin/dashboard">Dashboard Admin</NavDropdown.Item>
+                <NavDropdown.Item as={Link} to="/admin/campaigns">Kelola Kampanye</NavDropdown.Item>
+                <NavDropdown.Item as={Link} to="/admin/donations">Verifikasi Donasi</NavDropdown.Item>
+                <NavDropdown.Item as={Link} to="/admin/users">Kelola User</NavDropdown.Item>
+              </NavDropdown>
             )}
           </Nav>
           <Nav>

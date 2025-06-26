@@ -28,20 +28,42 @@ def save_file(file):
 @donations_bp.route('/campaigns', methods=['GET'])
 def get_campaigns():
     status = request.args.get('status')
-    organizer_id = request.args.get('organizer_id')
+    category = request.args.get('category')
+    featured = request.args.get('featured')
+    search = request.args.get('search')
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 12, type=int)
     
     query = Campaign.query
     
+    # Filter by status - default to only show active campaigns for public
     if status:
         query = query.filter_by(status=status)
+    else:
+        query = query.filter_by(status='active')
     
-    if organizer_id:
-        query = query.filter_by(organizer_id=organizer_id)
+    if category:
+        query = query.filter_by(category=category)
     
-    campaigns = query.order_by(Campaign.created_at.desc()).all()
+    if featured == 'true':
+        query = query.filter_by(is_featured=True)
+    
+    if search:
+        query = query.filter(
+            Campaign.title.contains(search) |
+            Campaign.description.contains(search)
+        )
+    
+    # Order by featured campaigns first, then by creation date
+    query = query.order_by(Campaign.is_featured.desc(), Campaign.created_at.desc())
+    
+    campaigns = query.paginate(page=page, per_page=per_page, error_out=False)
     
     return jsonify({
-        'campaigns': [campaign.to_dict() for campaign in campaigns]
+        'campaigns': [campaign.to_dict() for campaign in campaigns.items],
+        'total': campaigns.total,
+        'pages': campaigns.pages,
+        'current_page': page
     }), 200
 
 @donations_bp.route('/campaigns/<int:campaign_id>', methods=['GET'])
@@ -69,14 +91,15 @@ def create_campaign():
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     
-    if not user or user.role not in ['organizer', 'creator']:
-        return jsonify({'error': 'Unauthorized. Only organizers and creators can create campaigns'}), 403
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
     
     # Process form data
     title = request.form.get('title')
     description = request.form.get('description')
     target_amount = request.form.get('target_amount')
     end_date = request.form.get('end_date')
+    category = request.form.get('category')
     
     # Validate required fields
     if not title or not description or not target_amount:
@@ -84,21 +107,25 @@ def create_campaign():
     
     try:
         target_amount = float(target_amount)
+        if target_amount <= 0:
+            return jsonify({'error': 'Target amount must be greater than 0'}), 400
     except ValueError:
-        return jsonify({'error': 'Target amount must be a number'}), 400
+        return jsonify({'error': 'Target amount must be a valid number'}), 400
     
     # Process campaign image
     image_path = None
     if 'image' in request.files:
         image_path = save_file(request.files['image'])
     
-    # Create new campaign
+    # Create new campaign with pending status
     new_campaign = Campaign(
         title=title,
         description=description,
         target_amount=target_amount,
         image=image_path,
-        organizer_id=current_user_id
+        category=category,
+        creator_id=current_user_id,
+        status='pending'  # All new campaigns start as pending
     )
     
     # Set end date if provided
@@ -112,7 +139,7 @@ def create_campaign():
     db.session.commit()
     
     return jsonify({
-        'message': 'Campaign created successfully',
+        'message': 'Campaign created successfully and is pending approval',
         'campaign': new_campaign.to_dict()
     }), 201
 
@@ -120,14 +147,15 @@ def create_campaign():
 @jwt_required()
 def update_campaign(campaign_id):
     current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
     campaign = Campaign.query.get(campaign_id)
     
     if not campaign:
         return jsonify({'error': 'Campaign not found'}), 404
     
-    # Check if user is the organizer
-    if campaign.organizer_id != current_user_id:
-        return jsonify({'error': 'Unauthorized. Only the campaign organizer can update it'}), 403
+    # Check if user is the creator or admin
+    if campaign.creator_id != current_user_id and user.role != 'admin':
+        return jsonify({'error': 'Unauthorized. Only the campaign creator or admin can update it'}), 403
     
     # Update fields if provided
     if 'title' in request.form:
@@ -138,9 +166,12 @@ def update_campaign(campaign_id):
     
     if 'target_amount' in request.form:
         try:
-            campaign.target_amount = float(request.form.get('target_amount'))
+            target_amount = float(request.form.get('target_amount'))
+            if target_amount <= 0:
+                return jsonify({'error': 'Target amount must be greater than 0'}), 400
+            campaign.target_amount = target_amount
         except ValueError:
-            return jsonify({'error': 'Target amount must be a number'}), 400
+            return jsonify({'error': 'Target amount must be a valid number'}), 400
     
     if 'end_date' in request.form:
         try:
@@ -148,9 +179,13 @@ def update_campaign(campaign_id):
         except ValueError:
             pass
     
-    if 'status' in request.form:
+    if 'category' in request.form:
+        campaign.category = request.form.get('category')
+    
+    # Only admin can change status
+    if 'status' in request.form and user.role == 'admin':
         status = request.form.get('status')
-        if status in ['active', 'completed', 'cancelled']:
+        if status in ['pending', 'active', 'completed', 'cancelled', 'rejected']:
             campaign.status = status
     
     # Update image if provided
@@ -159,6 +194,7 @@ def update_campaign(campaign_id):
         if image_path:
             campaign.image = image_path
     
+    campaign.updated_at = datetime.utcnow()
     db.session.commit()
     
     return jsonify({
@@ -168,7 +204,7 @@ def update_campaign(campaign_id):
 
 # Donation Routes
 @donations_bp.route('/donate', methods=['POST'])
-@jwt_required()
+@jwt_required(optional=True)  # Allow anonymous donations
 def create_donation():
     current_user_id = get_jwt_identity()
     
@@ -176,23 +212,32 @@ def create_donation():
     campaign_id = request.form.get('campaign_id')
     amount = request.form.get('amount')
     message = request.form.get('message', '')
+    donor_name = request.form.get('donor_name', '')
+    payment_method = request.form.get('payment_method', 'bank_transfer')
+    is_anonymous = request.form.get('is_anonymous', 'false').lower() == 'true'
     
     # Validate required fields
     if not campaign_id or not amount:
-        return jsonify({'error': 'Missing required fields'}), 400
+        return jsonify({'error': 'Campaign ID and amount are required'}), 400
     
     try:
         amount = float(amount)
+        if amount <= 0:
+            return jsonify({'error': 'Amount must be greater than 0'}), 400
     except ValueError:
-        return jsonify({'error': 'Amount must be a number'}), 400
+        return jsonify({'error': 'Amount must be a valid number'}), 400
     
-    # Check if campaign exists
+    # Check if campaign exists and is active
     campaign = Campaign.query.get(campaign_id)
     if not campaign:
         return jsonify({'error': 'Campaign not found'}), 404
     
     if campaign.status != 'active':
         return jsonify({'error': 'Cannot donate to inactive campaigns'}), 400
+    
+    # For anonymous donations, require donor name if not logged in
+    if not current_user_id and not donor_name:
+        return jsonify({'error': 'Donor name is required for anonymous donations'}), 400
     
     # Process transfer proof
     transfer_proof = None
@@ -203,7 +248,10 @@ def create_donation():
     new_donation = Donation(
         amount=amount,
         message=message,
+        donor_name=donor_name if not current_user_id else None,
         transfer_proof=transfer_proof,
+        payment_method=payment_method,
+        is_anonymous=is_anonymous,
         donor_id=current_user_id,
         campaign_id=campaign_id
     )
@@ -212,40 +260,39 @@ def create_donation():
     db.session.commit()
     
     return jsonify({
-        'message': 'Donation created successfully',
+        'message': 'Donation created successfully. Please wait for verification.',
         'donation': new_donation.to_dict()
     }), 201
 
-@donations_bp.route('/donations/<int:donation_id>/verify', methods=['PUT'])
+@donations_bp.route('/<int:donation_id>/verify', methods=['PUT'])
 @jwt_required()
 def verify_donation(donation_id):
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     
-    if not user or user.role != 'organizer':
-        return jsonify({'error': 'Unauthorized. Only organizers can verify donations'}), 403
+    if not user or user.role not in ['admin', 'organizer']:
+        return jsonify({'error': 'Unauthorized. Only admins and organizers can verify donations'}), 403
     
     donation = Donation.query.get(donation_id)
     
     if not donation:
         return jsonify({'error': 'Donation not found'}), 404
     
-    # Check if user is the organizer of the campaign
-    campaign = Campaign.query.get(donation.campaign_id)
-    if campaign.organizer_id != current_user_id:
-        return jsonify({'error': 'Unauthorized. Only the campaign organizer can verify donations'}), 403
-    
-    status = request.json.get('status')
+    data = request.json
+    status = data.get('status')
+    rejection_reason = data.get('rejection_reason')
     
     if status not in ['verified', 'rejected']:
-        return jsonify({'error': 'Invalid status'}), 400
+        return jsonify({'error': 'Invalid status. Must be verified or rejected'}), 400
     
     donation.status = status
+    donation.verified_by = current_user_id
     
     if status == 'verified':
         donation.verified_at = datetime.utcnow()
         
         # Update campaign current amount
+        campaign = Campaign.query.get(donation.campaign_id)
         campaign.current_amount += donation.amount
         
         # Check if any milestones have been achieved
@@ -262,11 +309,42 @@ def verify_donation(donation_id):
         # Check if campaign target has been reached
         if campaign.current_amount >= campaign.target_amount and campaign.status == 'active':
             campaign.status = 'completed'
+            
+    elif status == 'rejected':
+        donation.rejection_reason = rejection_reason
     
     db.session.commit()
     
     return jsonify({
-        'message': f'Donation {status}',
+        'message': f'Donation {status} successfully',
+        'donation': donation.to_dict()
+    }), 200
+
+@donations_bp.route('/<int:donation_id>/reject', methods=['PUT'])
+@jwt_required()
+def reject_donation(donation_id):
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user or user.role not in ['admin', 'organizer']:
+        return jsonify({'error': 'Unauthorized. Only admins and organizers can reject donations'}), 403
+    
+    donation = Donation.query.get(donation_id)
+    
+    if not donation:
+        return jsonify({'error': 'Donation not found'}), 404
+    
+    data = request.json
+    rejection_reason = data.get('rejection_reason', 'No reason provided')
+    
+    donation.status = 'rejected'
+    donation.rejection_reason = rejection_reason
+    donation.verified_by = current_user_id
+    
+    db.session.commit()
+    
+    return jsonify({
+        'message': 'Donation rejected successfully',
         'donation': donation.to_dict()
     }), 200
 
@@ -282,7 +360,7 @@ def create_milestone(campaign_id):
         return jsonify({'error': 'Campaign not found'}), 404
     
     # Check if user is the organizer
-    if campaign.organizer_id != current_user_id:
+    if campaign.creator_id != current_user_id:
         return jsonify({'error': 'Unauthorized. Only the campaign organizer can add milestones'}), 403
     
     data = request.json
@@ -327,7 +405,7 @@ def update_milestone(campaign_id, milestone_id):
         return jsonify({'error': 'Campaign not found'}), 404
     
     # Check if user is the organizer
-    if campaign.organizer_id != current_user_id:
+    if campaign.creator_id != current_user_id:
         return jsonify({'error': 'Unauthorized. Only the campaign organizer can update milestones'}), 403
     
     milestone = Milestone.query.get(milestone_id)
@@ -358,8 +436,8 @@ def get_all_donations():
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     
-    if not user or user.role != 'organizer':
-        return jsonify({'error': 'Unauthorized. Only organizers can view all donations'}), 403
+    if not user or user.role not in ['organizer', 'admin']:
+        return jsonify({'error': 'Unauthorized. Only organizers and admins can view all donations'}), 403
     
     # Optional filter by status
     status = request.args.get('status')
@@ -407,7 +485,7 @@ def get_campaign_donations(campaign_id):
     user = User.query.get(current_user_id)
     
     # Only organizers and the campaign creator can see all donations
-    if user.role != 'organizer' and campaign.organizer_id != current_user_id:
+    if user.role != 'organizer' and campaign.creator_id != current_user_id:
         return jsonify({'error': 'Unauthorized. Only organizers and campaign creators can view all donations'}), 403
     
     donations = Donation.query.filter_by(campaign_id=campaign_id).order_by(Donation.created_at.desc()).all()

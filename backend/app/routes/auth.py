@@ -27,7 +27,8 @@ def register():
         username=data['username'],
         email=data['email'],
         full_name=data['full_name'],
-        role=data.get('role', 'donor')  # Default role is donor
+        role=data.get('role', 'user'),  # Default role is user
+        phone_number=data.get('phone_number')
     )
     new_user.set_password(data['password'])
     
@@ -67,8 +68,8 @@ def login():
         return jsonify({'error': 'Invalid credentials'}), 401
     
     # Create tokens
-    access_token = create_access_token(identity=user.id)
-    refresh_token = create_refresh_token(identity=user.id)
+    access_token = create_access_token(identity=str(user.id))
+    refresh_token = create_refresh_token(identity=str(user.id))
     
     return jsonify({
         'message': 'Login successful',
@@ -80,8 +81,8 @@ def login():
 @auth_bp.route('/refresh', methods=['POST'])
 @jwt_required(refresh=True)
 def refresh():
-    current_user_id = get_jwt_identity()
-    access_token = create_access_token(identity=current_user_id)
+    current_user_id = int(get_jwt_identity())
+    access_token = create_access_token(identity=str(current_user_id))
     
     return jsonify({
         'access_token': access_token
@@ -90,7 +91,7 @@ def refresh():
 @auth_bp.route('/me', methods=['GET'])
 @jwt_required()
 def get_current_user():
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())
     user = User.query.get(current_user_id)
     
     if not user:

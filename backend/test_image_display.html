@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Image Display</title>
+</head>
+<body>
+    <h1>Test Image Display</h1>
+    
+    <h2>Campaign 8 Image</h2>
+    <p>Image URL: /static/uploads/campaigns/20250627_010104_test_campaign.png</p>
+    <p>Full URL: http://localhost:5000/static/uploads/campaigns/20250627_010104_test_campaign.png</p>
+    
+    <img 
+        src="http://localhost:5000/static/uploads/campaigns/20250627_010104_test_campaign.png" 
+        alt="Test Campaign Image"
+        style="max-width: 400px; border: 1px solid #ddd;"
+        onload="console.log('Image loaded successfully')"
+        onerror="console.log('Image failed to load')"
+    />
+    
+    <h2>Direct API Test</h2>
+    <div id="api-test"></div>
+    
+    <script>
+        // Test API
+        fetch('http://localhost:5000/api/campaigns/8')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Campaign data:', data);
+                const div = document.getElementById('api-test');
+                div.innerHTML = `
+                    <p><strong>Title:</strong> ${data.title}</p>
+                    <p><strong>Image URL:</strong> ${data.image_url}</p>
+                    <p><strong>Status:</strong> ${data.status}</p>
+                `;
+                
+                if (data.image_url) {
+                    const img = document.createElement('img');
+                    img.src = 'http://localhost:5000' + data.image_url;
+                    img.style.maxWidth = '400px';
+                    img.style.border = '1px solid #ddd';
+                    img.onload = () => console.log('API image loaded successfully');
+                    img.onerror = () => console.log('API image failed to load');
+                    div.appendChild(img);
+                }
+            })
+            .catch(error => {
+                console.error('API error:', error);
+                document.getElementById('api-test').innerHTML = '<p>API Error: ' + error.message + '</p>';
+            });
+    </script>
+</body>
+</html>

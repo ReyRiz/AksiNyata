@@ -82,6 +82,16 @@ const Login = () => {
             </Button>
           </Form>
           
+          {/* Demo Credentials */}
+          <Alert variant="info" className="mt-3">
+            <strong>Demo Credentials:</strong><br />
+            <small>
+              <strong>Admin:</strong> admin@aksi-nyata.com / password123<br />
+              <strong>Organizer:</strong> organizer@test.com / password123<br />
+              <strong>User:</strong> test@example.com / password123
+            </small>
+          </Alert>
+          
           <div className="text-center mt-4">
             <p className="mb-0">
               Belum punya akun? <Link to="/register">Daftar sekarang</Link>

@@ -48,6 +48,21 @@ const Dashboard = () => {
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
       setError('Gagal memuat data dashboard.');
+      
+      // Ensure state is properly initialized even on error
+      setDashboardData({
+        campaigns: [],
+        donations: [],
+        pendingDonations: [],
+        recentMilestones: [],
+        stats: {
+          totalDonated: 0,
+          totalCampaigns: 0,
+          activeCampaigns: 0,
+          totalRaised: 0,
+          pendingDonationsCount: 0
+        }
+      });
     } finally {
       setLoading(false);
     }
@@ -74,18 +89,22 @@ const Dashboard = () => {
   
   // Calculate dashboard statistics
   const getStatistics = () => {
-    const stats = {
-      totalDonations: dashboardData.donations.length,
-      totalDonated: dashboardData.stats.totalDonated,
-      totalCampaigns: dashboardData.stats.totalCampaigns,
-      activeCampaigns: dashboardData.stats.activeCampaigns,
-      completedCampaigns: dashboardData.campaigns.filter(c => c.status === 'completed').length,
-      pendingDonations: dashboardData.stats.pendingDonationsCount,
-      verifiedDonations: dashboardData.donations.filter(d => d.status === 'verified').length,
-      totalRaised: dashboardData.stats.totalRaised
+    const campaigns = dashboardData.campaigns || [];
+    const donations = dashboardData.donations || [];
+    const stats = dashboardData.stats || {};
+    
+    const calculatedStats = {
+      totalDonations: donations.length,
+      totalDonated: stats.totalDonated || 0,
+      totalCampaigns: stats.totalCampaigns || 0,
+      activeCampaigns: stats.activeCampaigns || 0,
+      completedCampaigns: campaigns.filter(c => c?.status === 'completed').length,
+      pendingDonations: stats.pendingDonationsCount || 0,
+      verifiedDonations: donations.filter(d => d?.status === 'verified').length,
+      totalRaised: stats.totalRaised || 0
     };
     
-    return stats;
+    return calculatedStats;
   };
   
   const stats = getStatistics();
@@ -98,13 +117,23 @@ const Dashboard = () => {
       </Container>
     );
   }
+
+  if (!currentUser) {
+    return (
+      <Container className="py-5 text-center">
+        <Alert variant="warning">
+          User tidak ditemukan. Silakan login kembali.
+        </Alert>
+      </Container>
+    );
+  }
   
   return (
     <Container className="py-5">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="fw-bold">Dashboard</h1>
         
-        {(hasRole('organizer') || hasRole('creator')) && (
+        {currentUser && (
           <Button as={Link} to="/campaigns/create" variant="primary">
             Buat Kampanye Baru
           </Button>
@@ -166,11 +195,11 @@ const Dashboard = () => {
           {activeTab === 'overview' && (
             <>
               <div className="dashboard-card">
-                <h3>Selamat Datang, {currentUser.full_name}!</h3>
+                <h3>Selamat Datang, {currentUser?.full_name || 'User'}!</h3>
                 <p>
-                  Sebagai <span className={`role-badge role-${currentUser.role}`}>{currentUser.role}</span>, 
-                  Anda dapat {currentUser.role === 'donor' ? 'berdonasi ke berbagai kampanye' : 
-                    currentUser.role === 'creator' ? 'membuat dan mengelola kampanye donasi' : 
+                  Sebagai <span className={`role-badge role-${currentUser?.role || 'user'}`}>{currentUser?.role || 'user'}</span>, 
+                  Anda dapat {currentUser?.role === 'donor' ? 'berdonasi ke berbagai kampanye' : 
+                    currentUser?.role === 'creator' ? 'membuat dan mengelola kampanye donasi' : 
                     'mengelola kampanye dan memverifikasi donasi'}.
                 </p>
               </div>
@@ -260,13 +289,13 @@ const Dashboard = () => {
                   <h3>Aktivitas Terbaru</h3>
                 </div>
                 
-                {dashboardData.donations.length === 0 ? (
+                {(dashboardData.donations || []).length === 0 ? (
                   <p className="text-center py-3 text-muted">
                     Belum ada aktivitas donasi.
                   </p>
                 ) : (
                   <div>
-                    {dashboardData.donations.slice(0, 5).map(donation => (
+                    {(dashboardData.donations || []).slice(0, 5).map(donation => (
                       <div key={donation.id} className="donation-item">
                         <div className="d-flex justify-content-between align-items-start">
                           <div>
@@ -318,7 +347,7 @@ const Dashboard = () => {
                 </Button>
               </div>
               
-              {dashboardData.campaigns.length === 0 ? (
+              {(dashboardData.campaigns || []).length === 0 ? (
                 <div className="text-center py-4">
                   <p className="mb-3">Anda belum memiliki kampanye donasi.</p>
                   <Button as={Link} to="/campaigns/create" variant="primary">
@@ -327,11 +356,12 @@ const Dashboard = () => {
                 </div>
               ) : (
                 <div>
-                  {dashboardData.campaigns.map(campaign => (
+                  {(dashboardData.campaigns || []).map(campaign => (
                     <Card key={campaign.id} className="mb-3 border-0 shadow-sm">
                       <Card.Body>
                         <Row>
-                          <Col md={2}>                              {campaign.image ? (
+                          <Col md={2}>
+                            {campaign.image ? (
                               <img 
                                 src={`http://localhost:5000/static/${campaign.image}`}
                                 alt={campaign.title}
@@ -358,7 +388,7 @@ const Dashboard = () => {
                               </Link>
                             </h5>
                             <p className="mb-2 small">
-                              {formatCurrency(campaign.current_amount)} dari {formatCurrency(campaign.target_amount)} ({campaign.progress_percentage}%)
+                              {formatCurrency(campaign.current_amount || 0)} dari {formatCurrency(campaign.target_amount || 0)} ({(campaign.progress_percentage || 0)}%)
                             </p>
                             <div className="d-flex gap-2">
                               {campaign.status === 'active' ? (
@@ -368,7 +398,7 @@ const Dashboard = () => {
                               ) : (
                                 <span className="badge bg-danger">Dibatalkan</span>
                               )}
-                              <span className="badge bg-secondary">{campaign.donations.length} donasi</span>
+                              <span className="badge bg-secondary">{(campaign.donations || []).length} donasi</span>
                             </div>
                           </Col>
                           <Col md={3} className="d-flex align-items-center justify-content-end">
@@ -403,7 +433,7 @@ const Dashboard = () => {
             <div className="dashboard-card">
               <h3>Donasi Saya</h3>
               
-              {dashboardData.donations.length === 0 ? (
+              {(dashboardData.donations || []).length === 0 ? (
                 <div className="text-center py-4">
                   <p className="mb-3">Anda belum melakukan donasi.</p>
                   <Button as={Link} to="/campaigns" variant="primary">
@@ -412,7 +442,7 @@ const Dashboard = () => {
                 </div>
               ) : (
                 <div>
-                  {dashboardData.donations.map(donation => (
+                  {(dashboardData.donations || []).map(donation => (
                     <Card key={donation.id} className="mb-3 border-0 shadow-sm">
                       <Card.Body>
                         <Row>

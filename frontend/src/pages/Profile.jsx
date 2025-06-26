@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { getUserProfile, updateUserProfile } from '../services/api';
 
 const Profile = () => {
-  const { currentUser, updateUser } = useAuth();
+  const { currentUser, updateProfile } = useAuth();
   const [profile, setProfile] = useState({
     name: '',
     email: '',
@@ -84,7 +84,7 @@ const Profile = () => {
       await updateUserProfile(updateData);
       
       // Update context with new user data
-      updateUser({
+      updateProfile({
         ...currentUser,
         name: profile.name,
         email: profile.email,

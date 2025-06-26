@@ -27,7 +27,7 @@ def save_file(file):
 @jwt_required()
 def get_profile():
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         user = User.query.get(current_user_id)
         
         if not user:
@@ -41,7 +41,7 @@ def get_profile():
         campaigns = []
         if user.role in ['creator', 'organizer']:
             from app.models.models import Campaign
-            campaigns = Campaign.query.filter_by(organizer_id=current_user_id).all()
+            campaigns = Campaign.query.filter_by(creator_id=current_user_id).all()
         
         return jsonify({
             'user': user.to_dict(),
@@ -55,7 +55,7 @@ def get_profile():
 @users_bp.route('/profile', methods=['PUT'])
 @jwt_required()
 def update_profile():
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())
     user = User.query.get(current_user_id)
     
     if not user:
@@ -104,11 +104,11 @@ def get_user(user_id):
 @users_bp.route('', methods=['GET'])
 @jwt_required()
 def get_users():
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())
     current_user = User.query.get(current_user_id)
     
-    if not current_user or current_user.role != 'organizer':
-        return jsonify({'error': 'Unauthorized. Only organizers can access this'}), 403
+    if not current_user or current_user.role not in ['organizer', 'admin']:
+        return jsonify({'error': 'Unauthorized. Only organizers and admins can access this'}), 403
     
     users = User.query.all()
     
@@ -117,11 +117,11 @@ def get_users():
 @users_bp.route('/<int:user_id>/role', methods=['PUT'])
 @jwt_required()
 def update_user_role(user_id):
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())
     current_user = User.query.get(current_user_id)
     
-    if not current_user or current_user.role != 'organizer':
-        return jsonify({'error': 'Unauthorized. Only organizers can update roles'}), 403
+    if not current_user or current_user.role not in ['organizer', 'admin']:
+        return jsonify({'error': 'Unauthorized. Only organizers and admins can update roles'}), 403
     
     user = User.query.get(user_id)
     if not user:
@@ -146,7 +146,7 @@ def update_user_role(user_id):
 @users_bp.route('/<int:user_id>/deactivate', methods=['PUT'])
 @jwt_required()
 def deactivate_user(user_id):
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())
     current_user = User.query.get(current_user_id)
     
     if not current_user or current_user.role != 'organizer':
@@ -171,7 +171,7 @@ def deactivate_user(user_id):
 @users_bp.route('/<int:user_id>/activate', methods=['PUT'])
 @jwt_required()
 def activate_user(user_id):
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())
     current_user = User.query.get(current_user_id)
     
     if not current_user or current_user.role != 'organizer':
@@ -192,7 +192,7 @@ def activate_user(user_id):
 @users_bp.route('/change-role/<int:user_id>', methods=['PUT'])
 @jwt_required()
 def change_role(user_id):
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())
     admin = User.query.get(current_user_id)
     
     if not admin or admin.role != 'organizer':
@@ -221,7 +221,7 @@ def change_role(user_id):
 @jwt_required()
 def get_dashboard():
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         user = User.query.get(current_user_id)
         
         if not user:
@@ -231,65 +231,81 @@ def get_dashboard():
         from app.models.models import Donation, Campaign, Milestone
         from sqlalchemy import func
         
-        # Get user's donations
+        # Get user's donations (for all roles)
         user_donations = Donation.query.filter_by(donor_id=current_user_id).all()
         
-        # Get user's campaigns if they are an organizer or creator
-        user_campaigns = []
-        if user.role in ['organizer', 'creator']:
-            user_campaigns = Campaign.query.filter_by(organizer_id=current_user_id).all()
-        
-        # Get pending donations for verification if user is an organizer
-        pending_donations = []
-        if user.role == 'organizer':
-            # Get pending donations for all campaigns created by this organizer
-            campaign_ids = [campaign.id for campaign in user_campaigns]
-            if campaign_ids:
-                pending_donations = Donation.query.filter(
-                    Donation.campaign_id.in_(campaign_ids),
-                    Donation.status == 'pending'
-                ).all()
-        
-        # Calculate stats
-        total_donated = sum(donation.amount for donation in user_donations if donation.status == 'verified')
-        total_campaigns = len(user_campaigns)
-        
-        # Count active campaigns
-        active_campaigns = sum(1 for campaign in user_campaigns if campaign.status == 'active')
-        
-        # Calculate total raised across all campaigns
-        total_raised = 0
-        for campaign in user_campaigns:
-            # Sum verified donations for each campaign
-            campaign_donations = Donation.query.filter_by(
-                campaign_id=campaign.id,
-                status='verified'
-            ).all()
-            campaign_total = sum(donation.amount for donation in campaign_donations)
-            total_raised += campaign_total
-        
-        # Get recent milestones
-        recent_milestones = []
-        if user_campaigns:
-            campaign_ids = [campaign.id for campaign in user_campaigns]
-            recent_milestones = Milestone.query.filter(
-                Milestone.campaign_id.in_(campaign_ids)
-            ).order_by(Milestone.created_at.desc()).limit(5).all()
-        
+        # Initialize dashboard data
         dashboard_data = {
             'user': user.to_dict(),
             'stats': {
-                'total_donated': total_donated,
-                'total_campaigns': total_campaigns,
-                'active_campaigns': active_campaigns,
-                'total_raised': total_raised,
-                'pending_donations_count': len(pending_donations)
+                'total_donated': 0,
+                'total_campaigns': 0,
+                'active_campaigns': 0,
+                'total_raised': 0,
+                'pending_donations_count': 0
             },
             'donations': [donation.to_dict() for donation in user_donations],
-            'campaigns': [campaign.to_dict() for campaign in user_campaigns],
-            'pending_donations': [donation.to_dict() for donation in pending_donations],
-            'recent_milestones': [milestone.to_dict() for milestone in recent_milestones]
+            'campaigns': [],
+            'pending_donations': [],
+            'recent_milestones': []
         }
+        
+        # Calculate total donated by this user
+        total_donated = sum(donation.amount for donation in user_donations if donation.status == 'verified')
+        dashboard_data['stats']['total_donated'] = total_donated
+        
+        # Role-specific data
+        if user.role in ['organizer', 'creator']:
+            # Get campaigns created by this user
+            user_campaigns = Campaign.query.filter_by(creator_id=current_user_id).all()
+            dashboard_data['campaigns'] = [campaign.to_dict() for campaign in user_campaigns]
+            dashboard_data['stats']['total_campaigns'] = len(user_campaigns)
+            
+            # Count active campaigns
+            active_campaigns = sum(1 for campaign in user_campaigns if campaign.status == 'active')
+            dashboard_data['stats']['active_campaigns'] = active_campaigns
+            
+            # Calculate total raised across all campaigns
+            total_raised = 0
+            for campaign in user_campaigns:
+                campaign_donations = Donation.query.filter_by(
+                    campaign_id=campaign.id,
+                    status='verified'
+                ).all()
+                campaign_total = sum(donation.amount for donation in campaign_donations)
+                total_raised += campaign_total
+            dashboard_data['stats']['total_raised'] = total_raised
+            
+            # Get pending donations for verification (organizers)
+            if user.role == 'organizer':
+                campaign_ids = [campaign.id for campaign in user_campaigns]
+                if campaign_ids:
+                    pending_donations = Donation.query.filter(
+                        Donation.campaign_id.in_(campaign_ids),
+                        Donation.status == 'pending'
+                    ).all()
+                    dashboard_data['pending_donations'] = [donation.to_dict() for donation in pending_donations]
+                    dashboard_data['stats']['pending_donations_count'] = len(pending_donations)
+            
+            # Get recent milestones
+            if user_campaigns:
+                campaign_ids = [campaign.id for campaign in user_campaigns]
+                recent_milestones = Milestone.query.filter(
+                    Milestone.campaign_id.in_(campaign_ids)
+                ).order_by(Milestone.created_at.desc()).limit(5).all()
+                dashboard_data['recent_milestones'] = [milestone.to_dict() for milestone in recent_milestones]
+        
+        elif user.role in ['donor', 'user']:
+            # For donors/users, focus on their donation activity
+            # Get campaigns they've donated to
+            donated_campaign_ids = list(set([d.campaign_id for d in user_donations]))
+            if donated_campaign_ids:
+                donated_campaigns = Campaign.query.filter(Campaign.id.in_(donated_campaign_ids)).all()
+                dashboard_data['campaigns'] = [campaign.to_dict() for campaign in donated_campaigns]
+            
+            # Additional stats for donors
+            dashboard_data['stats']['campaigns_supported'] = len(donated_campaign_ids)
+            dashboard_data['stats']['total_donations_count'] = len(user_donations)
         
         return jsonify(dashboard_data), 200
     except Exception as e:
