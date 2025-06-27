@@ -42,8 +42,8 @@ const Footer = () => {
           </Col>
           <Col md={4} className="text-start">
             <h6 className="fw-bold mb-3">Hubungi Kami</h6>
-            <p className="mb-2"><i className="bi bi-geo-alt-fill me-2 text-primary"></i> Jl. Contoh No. 123, Jakarta, Indonesia</p>
-            <p className="mb-2"><i className="bi bi-telephone-fill me-2 text-primary"></i> +62 123 4567 890</p>
+            <p className="mb-2"><i className="bi bi-geo-alt-fill me-2 text-primary"></i>Makassar</p>
+            <p className="mb-2"><i className="bi bi-telephone-fill me-2 text-primary"></i> Coming Soon Ya Disini</p>
             <p className="mb-2"><i className="bi bi-envelope-fill me-2 text-primary"></i> info@aksinyata.id</p>
             <p className="mb-2"><i className="bi bi-clock-fill me-2 text-primary"></i> Senin - Jumat: 09:00 - 17:00</p>
           </Col>
